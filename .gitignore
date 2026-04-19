@@ -1,0 +1,13 @@
+# Android/Gradle local files
+.local/
+.idea/
+*.iml
+local.properties
+
+# Gradle cache
+.gradle/
+build/
+**/build/
+
+# Ignore binary wrapper jar in this repo (text-only policy)
+gradle/wrapper/gradle-wrapper.jar
