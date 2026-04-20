@@ -6,6 +6,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.room.Room
+import com.example.financeapp.data.DocumentRepository
 import com.example.financeapp.db.AppDatabase
 import com.example.financeapp.navigation.AppNavHost
 
@@ -19,6 +20,10 @@ class MainActivity : ComponentActivity() {
         ).fallbackToDestructiveMigration().build()
     }
 
+    private val repository by lazy {
+        DocumentRepository(db.simpleRecordDao())
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         db.openHelper.writableDatabase
@@ -26,7 +31,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             MaterialTheme {
                 Surface {
-                    AppNavHost()
+                    AppNavHost(repository = repository)
                 }
             }
         }
