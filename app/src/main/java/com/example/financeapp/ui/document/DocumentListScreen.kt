@@ -56,7 +56,7 @@ fun DocumentListScreen(
             ) {
                 Row(modifier = Modifier.padding(12.dp)) {
                     AsyncImage(
-                        model = document.uri,
+                        model = document.appUri,
                         contentDescription = "document",
                         modifier = Modifier.size(72.dp)
                     )

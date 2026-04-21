@@ -16,6 +16,6 @@ interface DocumentDao {
     @Query("SELECT * FROM documents WHERE id = :documentId LIMIT 1")
     fun observeById(documentId: Long): Flow<DocumentEntity?>
 
-    @Query("SELECT * FROM documents WHERE uri = :uri LIMIT 1")
-    suspend fun findByUri(uri: String): DocumentEntity?
+    @Query("SELECT * FROM documents WHERE originalUri = :originalUri LIMIT 1")
+    suspend fun findByOriginalUri(originalUri: String): DocumentEntity?
 }

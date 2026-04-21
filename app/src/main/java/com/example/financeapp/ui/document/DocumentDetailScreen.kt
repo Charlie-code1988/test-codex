@@ -49,7 +49,7 @@ fun DocumentDetailScreen(
             .padding(16.dp)
     ) {
         AsyncImage(
-            model = document.uri,
+            model = document.appUri,
             contentDescription = "document_preview",
             modifier = Modifier
                 .fillMaxWidth()
@@ -62,7 +62,8 @@ fun DocumentDetailScreen(
             color = MaterialTheme.colorScheme.primary,
             modifier = Modifier.padding(top = 8.dp)
         )
-        Text(text = "uri: ${document.uri}", modifier = Modifier.padding(top = 8.dp))
+        Text(text = "appUri: ${document.appUri}", modifier = Modifier.padding(top = 8.dp))
+        Text(text = "originalUri: ${document.originalUri ?: "-"}", modifier = Modifier.padding(top = 8.dp))
     }
 }
 
