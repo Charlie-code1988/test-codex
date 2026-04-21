@@ -5,5 +5,14 @@ data class Document(
     val originalUri: String?,
     val appUri: String,
     val createdAt: Long,
-    val status: String
+    val status: String,
+    val ocrStatus: String,
+    val ocrRawText: String?,
+    val ocrUpdatedAt: Long?
 )
+
+object OcrStatuses {
+    const val IDLE = "IDLE"
+    const val SUCCESS = "SUCCESS"
+    const val FAILED = "FAILED"
+}

@@ -2,6 +2,7 @@ package com.example.financeapp.db
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.example.financeapp.data.OcrStatuses
 
 @Entity(tableName = "documents")
 data class DocumentEntity(
@@ -9,5 +10,8 @@ data class DocumentEntity(
     val originalUri: String?,
     val appUri: String,
     val createdAt: Long,
-    val status: String = "IMPORTED"
+    val status: String = "IMPORTED",
+    val ocrStatus: String = OcrStatuses.IDLE,
+    val ocrRawText: String? = null,
+    val ocrUpdatedAt: Long? = null
 )

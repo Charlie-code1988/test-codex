@@ -18,4 +18,23 @@ interface DocumentDao {
 
     @Query("SELECT * FROM documents WHERE originalUri = :originalUri LIMIT 1")
     suspend fun findByOriginalUri(originalUri: String): DocumentEntity?
+
+    @Query("SELECT * FROM documents WHERE id = :documentId LIMIT 1")
+    suspend fun getById(documentId: Long): DocumentEntity?
+
+    @Query(
+        """
+        UPDATE documents
+        SET ocrStatus = :ocrStatus,
+            ocrRawText = :ocrRawText,
+            ocrUpdatedAt = :ocrUpdatedAt
+        WHERE id = :documentId
+        """
+    )
+    suspend fun updateOcrResult(
+        documentId: Long,
+        ocrStatus: String,
+        ocrRawText: String?,
+        ocrUpdatedAt: Long
+    )
 }

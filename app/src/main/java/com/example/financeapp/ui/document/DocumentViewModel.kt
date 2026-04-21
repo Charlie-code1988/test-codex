@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.financeapp.data.Document
 import com.example.financeapp.data.DocumentRepository
 import com.example.financeapp.data.ImportResult
+import com.example.financeapp.data.OcrResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +18,7 @@ data class DocumentUiState(
     val documents: List<Document> = emptyList(),
     val selectedDocument: Document? = null,
     val isImporting: Boolean = false,
+    val isRunningOcr: Boolean = false,
     val infoMessage: String? = null,
     val errorMessage: String? = null
 )
@@ -65,6 +67,24 @@ class DocumentViewModel(
         }
     }
 
+    fun runOcr(documentId: Long) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isRunningOcr = true, infoMessage = null, errorMessage = null) }
+            when (val result = repository.runOcr(documentId)) {
+                is OcrResult.Success -> {
+                    _uiState.update { it.copy(infoMessage = "OCR 识别成功") }
+                }
+                is OcrResult.Failed -> {
+                    _uiState.update { it.copy(errorMessage = "OCR 失败：${result.message}") }
+                }
+                is OcrResult.DocumentNotFound -> {
+                    _uiState.update { it.copy(errorMessage = "OCR 失败：单据不存在") }
+                }
+            }
+            _uiState.update { it.copy(isRunningOcr = false) }
+        }
+    }
+
     fun onPickerCanceled() {
         _uiState.update { it.copy(infoMessage = "已取消选图") }
     }
@@ -76,10 +96,6 @@ class DocumentViewModel(
                 _uiState.update { it.copy(selectedDocument = doc) }
             }
         }
-    }
-
-    fun clearMessage() {
-        _uiState.update { it.copy(infoMessage = null, errorMessage = null) }
     }
 }
 
