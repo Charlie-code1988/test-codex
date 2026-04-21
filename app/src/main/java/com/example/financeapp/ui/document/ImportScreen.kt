@@ -11,8 +11,8 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -26,7 +26,11 @@ fun ImportScreen(
     val launcher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent()
     ) { uri ->
-        uri?.let { viewModel.importDocument(it.toString()) }
+        if (uri == null) {
+            viewModel.onPickerCanceled()
+        } else {
+            viewModel.importDocument(uri.toString())
+        }
     }
 
     Column(
@@ -44,7 +48,15 @@ fun ImportScreen(
             CircularProgressIndicator(modifier = Modifier.padding(top = 16.dp))
         }
 
-        uiState.lastError?.let {
+        uiState.infoMessage?.let {
+            Text(
+                text = it,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(top = 12.dp)
+            )
+        }
+
+        uiState.errorMessage?.let {
             Text(
                 text = it,
                 color = MaterialTheme.colorScheme.error,

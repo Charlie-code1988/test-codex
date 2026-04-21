@@ -1,33 +1,49 @@
 package com.example.financeapp.data
 
-import com.example.financeapp.db.SimpleRecordDao
-import com.example.financeapp.db.SimpleRecordEntity
+import com.example.financeapp.db.DocumentDao
+import com.example.financeapp.db.DocumentEntity
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 
 class DocumentRepository(
-    private val dao: SimpleRecordDao
+    private val dao: DocumentDao
 ) {
+
     fun observeDocuments(): Flow<List<Document>> {
-        return dao.observeAll().map { entities ->
-            entities.map { entity ->
-                Document(
-                    id = entity.id,
-                    uri = entity.uri,
-                    createdAt = entity.createdAt,
-                    status = entity.status
-                )
-            }
-        }
+        return dao.observeAll().map { entities -> entities.map { it.toModel() } }
     }
 
-    suspend fun insertDocument(uri: String) {
+    fun observeDocumentById(documentId: Long): Flow<Document?> {
+        return dao.observeById(documentId).map { it?.toModel() }
+    }
+
+    suspend fun importDocument(uri: String): ImportResult {
+        val existing = dao.findByUri(uri)
+        if (existing != null) {
+            return ImportResult.Duplicate(existing.toModel())
+        }
+
         dao.insert(
-            SimpleRecordEntity(
+            DocumentEntity(
                 uri = uri,
                 createdAt = System.currentTimeMillis(),
                 status = "IMPORTED"
             )
         )
+        return ImportResult.Success
     }
+
+    private fun DocumentEntity.toModel(): Document {
+        return Document(
+            id = id,
+            uri = uri,
+            createdAt = createdAt,
+            status = status
+        )
+    }
+}
+
+sealed interface ImportResult {
+    data object Success : ImportResult
+    data class Duplicate(val existing: Document) : ImportResult
 }

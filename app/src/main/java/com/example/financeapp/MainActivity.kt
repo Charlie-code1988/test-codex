@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private val repository by lazy {
-        DocumentRepository(db.simpleRecordDao())
+        DocumentRepository(db.documentDao())
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {

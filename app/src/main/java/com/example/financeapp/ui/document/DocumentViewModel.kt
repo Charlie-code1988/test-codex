@@ -5,6 +5,8 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.financeapp.data.Document
 import com.example.financeapp.data.DocumentRepository
+import com.example.financeapp.data.ImportResult
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,8 +15,10 @@ import kotlinx.coroutines.launch
 
 data class DocumentUiState(
     val documents: List<Document> = emptyList(),
+    val selectedDocument: Document? = null,
     val isImporting: Boolean = false,
-    val lastError: String? = null
+    val infoMessage: String? = null,
+    val errorMessage: String? = null
 )
 
 class DocumentViewModel(
@@ -23,6 +27,8 @@ class DocumentViewModel(
 
     private val _uiState = MutableStateFlow(DocumentUiState())
     val uiState: StateFlow<DocumentUiState> = _uiState.asStateFlow()
+
+    private var detailJob: Job? = null
 
     init {
         viewModelScope.launch {
@@ -34,16 +40,46 @@ class DocumentViewModel(
 
     fun importDocument(uri: String) {
         viewModelScope.launch {
-            _uiState.update { it.copy(isImporting = true, lastError = null) }
-            runCatching {
-                repository.insertDocument(uri)
-            }.onFailure { throwable ->
-                _uiState.update {
-                    it.copy(lastError = throwable.message ?: "Import failed")
+            _uiState.update { it.copy(isImporting = true, infoMessage = null, errorMessage = null) }
+
+            runCatching { repository.importDocument(uri) }
+                .onSuccess { result ->
+                    when (result) {
+                        is ImportResult.Success -> {
+                            _uiState.update { it.copy(infoMessage = "导入成功") }
+                        }
+                        is ImportResult.Duplicate -> {
+                            _uiState.update {
+                                it.copy(infoMessage = "重复导入提醒：该图片已导入（ID=${result.existing.id}）")
+                            }
+                        }
+                    }
                 }
-            }
+                .onFailure { throwable ->
+                    _uiState.update {
+                        it.copy(errorMessage = throwable.message ?: "导入失败")
+                    }
+                }
+
             _uiState.update { it.copy(isImporting = false) }
         }
+    }
+
+    fun onPickerCanceled() {
+        _uiState.update { it.copy(infoMessage = "已取消选图") }
+    }
+
+    fun observeDocumentDetail(documentId: Long) {
+        detailJob?.cancel()
+        detailJob = viewModelScope.launch {
+            repository.observeDocumentById(documentId).collect { doc ->
+                _uiState.update { it.copy(selectedDocument = doc) }
+            }
+        }
+    }
+
+    fun clearMessage() {
+        _uiState.update { it.copy(infoMessage = null, errorMessage = null) }
     }
 }
 

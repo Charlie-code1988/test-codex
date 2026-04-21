@@ -1,5 +1,6 @@
 package com.example.financeapp.ui.document
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,8 +14,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
@@ -24,7 +25,8 @@ import java.util.Locale
 
 @Composable
 fun DocumentListScreen(
-    viewModel: DocumentViewModel
+    viewModel: DocumentViewModel,
+    onOpenDetail: (Long) -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -35,7 +37,7 @@ fun DocumentListScreen(
                 .padding(16.dp),
             verticalArrangement = Arrangement.Center
         ) {
-            Text("暂无单据，请先导入图片")
+            Text("空列表：暂无单据，请先导入图片")
         }
         return
     }
@@ -47,7 +49,11 @@ fun DocumentListScreen(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         items(uiState.documents, key = { it.id }) { document ->
-            Card(modifier = Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenDetail(document.id) }
+            ) {
                 Row(modifier = Modifier.padding(12.dp)) {
                     AsyncImage(
                         model = document.uri,
@@ -60,11 +66,6 @@ fun DocumentListScreen(
                         Text(
                             text = "状态：${document.status}",
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-                        Text(
-                            text = document.uri,
-                            style = MaterialTheme.typography.bodySmall,
                             modifier = Modifier.padding(top = 4.dp)
                         )
                     }
