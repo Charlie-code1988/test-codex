@@ -6,6 +6,7 @@ import com.example.financeapp.db.DocumentDao
 import com.example.financeapp.db.DocumentEntity
 import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
@@ -47,16 +48,28 @@ class DocumentRepository(
     suspend fun runOcr(documentId: Long): OcrResult {
         val document = dao.getById(documentId) ?: return OcrResult.DocumentNotFound
 
+        dao.updateOcrResult(
+            documentId = documentId,
+            ocrStatus = OcrStatuses.RUNNING,
+            ocrRawText = document.ocrRawText,
+            ocrUpdatedAt = System.currentTimeMillis()
+        )
+
         return runCatching {
             val image = InputImage.fromFilePath(context, Uri.parse(document.appUri))
-            val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
-            val result = recognizer.process(image).await()
-            val rawText = result.text
+
+            val latinRecognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+            val chineseRecognizer = TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
+
+            val latinText = latinRecognizer.process(image).await().text.orEmpty()
+            val chineseText = chineseRecognizer.process(image).await().text.orEmpty()
+
+            val mergedText = selectBetterText(latinText, chineseText)
 
             dao.updateOcrResult(
                 documentId = documentId,
                 ocrStatus = OcrStatuses.SUCCESS,
-                ocrRawText = rawText,
+                ocrRawText = mergedText,
                 ocrUpdatedAt = System.currentTimeMillis()
             )
             OcrResult.Success
@@ -68,6 +81,16 @@ class DocumentRepository(
                 ocrUpdatedAt = System.currentTimeMillis()
             )
             OcrResult.Failed(throwable.message ?: "OCR 失败")
+        }
+    }
+
+    private fun selectBetterText(latinText: String, chineseText: String): String {
+        val chineseChars = chineseText.count { it.code in 0x4E00..0x9FFF }
+        return when {
+            chineseChars > 4 && chineseText.length >= latinText.length / 2 -> chineseText
+            latinText.isBlank() -> chineseText
+            chineseText.isBlank() -> latinText
+            else -> if (chineseText.length > latinText.length) chineseText else latinText
         }
     }
 

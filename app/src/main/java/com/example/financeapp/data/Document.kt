@@ -13,6 +13,7 @@ data class Document(
 
 object OcrStatuses {
     const val IDLE = "IDLE"
+    const val RUNNING = "RUNNING"
     const val SUCCESS = "SUCCESS"
     const val FAILED = "FAILED"
 }

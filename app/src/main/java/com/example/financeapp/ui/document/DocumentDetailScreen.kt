@@ -1,10 +1,16 @@
 package com.example.financeapp.ui.document
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.weight
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -14,6 +20,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
@@ -26,6 +34,7 @@ fun DocumentDetailScreen(
     viewModel: DocumentViewModel
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val clipboardManager = LocalClipboardManager.current
 
     LaunchedEffect(documentId) {
         viewModel.observeDocumentDetail(documentId)
@@ -47,6 +56,7 @@ fun DocumentDetailScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
         AsyncImage(
@@ -59,6 +69,7 @@ fun DocumentDetailScreen(
 
         Button(
             onClick = { viewModel.runOcr(document.id) },
+            enabled = !uiState.isRunningOcr,
             modifier = Modifier.padding(top = 12.dp)
         ) {
             Text(if (uiState.isRunningOcr) "OCR 识别中..." else "执行 OCR")
@@ -74,10 +85,33 @@ fun DocumentDetailScreen(
         Text(text = "appUri: ${document.appUri}", modifier = Modifier.padding(top = 8.dp))
         Text(text = "originalUri: ${document.originalUri ?: "-"}", modifier = Modifier.padding(top = 8.dp))
 
-        Text(text = "ocrStatus: ${document.ocrStatus}", modifier = Modifier.padding(top = 12.dp))
+        Text(
+            text = "ocrStatus: ${document.ocrStatus}",
+            color = statusColor(document.ocrStatus),
+            modifier = Modifier.padding(top = 12.dp)
+        )
         Text(text = "ocrUpdatedAt: ${document.ocrUpdatedAt?.let { formatTime(it) } ?: "-"}")
-        Text(text = "ocrRawText:", modifier = Modifier.padding(top = 8.dp))
-        Text(text = document.ocrRawText ?: "(空)")
+
+        Row(modifier = Modifier.padding(top = 8.dp)) {
+            Text(text = "ocrRawText:", modifier = Modifier.weight(1f))
+            Button(
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(document.ocrRawText.orEmpty()))
+                }
+            ) {
+                Text("复制 OCR 文本")
+            }
+        }
+
+        Text(
+            text = document.ocrRawText ?: "(空)",
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = 180.dp, max = 360.dp)
+                .verticalScroll(rememberScrollState())
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(12.dp)
+        )
 
         uiState.infoMessage?.let {
             Text(
@@ -95,6 +129,15 @@ fun DocumentDetailScreen(
             )
         }
     }
+}
+
+@Composable
+private fun statusColor(status: String) = when (status) {
+    "IDLE" -> MaterialTheme.colorScheme.outline
+    "RUNNING" -> MaterialTheme.colorScheme.tertiary
+    "SUCCESS" -> MaterialTheme.colorScheme.primary
+    "FAILED" -> MaterialTheme.colorScheme.error
+    else -> MaterialTheme.colorScheme.onSurface
 }
 
 private fun formatTime(timestamp: Long): String {
