@@ -161,7 +161,7 @@ class DocumentRepository(
             val shouldMerge = next != null &&
                 current.length <= 6 &&
                 next.length >= 3 &&
-                !current.endsWith(Regex("[。；;:：.!?？]"))
+                !listOf("。", "；", ";", ":", "：", ".", "!", "?", "？").any { current.endsWith(it) }
 
             if (shouldMerge) {
                 result += (current + next)
