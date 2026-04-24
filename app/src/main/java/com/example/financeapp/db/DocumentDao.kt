@@ -26,6 +26,9 @@ interface DocumentDao {
         """
         UPDATE documents
         SET ocrStatus = :ocrStatus,
+            latinRawText = :latinRawText,
+            chineseRawText = :chineseRawText,
+            finalOcrText = :finalOcrText,
             ocrRawText = :ocrRawText,
             ocrUpdatedAt = :ocrUpdatedAt
         WHERE id = :documentId
@@ -34,6 +37,9 @@ interface DocumentDao {
     suspend fun updateOcrResult(
         documentId: Long,
         ocrStatus: String,
+        latinRawText: String?,
+        chineseRawText: String?,
+        finalOcrText: String?,
         ocrRawText: String?,
         ocrUpdatedAt: Long
     )

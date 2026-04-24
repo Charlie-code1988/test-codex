@@ -7,6 +7,9 @@ data class Document(
     val createdAt: Long,
     val status: String,
     val ocrStatus: String,
+    val latinRawText: String?,
+    val chineseRawText: String?,
+    val finalOcrText: String?,
     val ocrRawText: String?,
     val ocrUpdatedAt: Long?
 )

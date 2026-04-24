@@ -12,6 +12,9 @@ data class DocumentEntity(
     val createdAt: Long,
     val status: String = "IMPORTED",
     val ocrStatus: String = OcrStatuses.IDLE,
+    val latinRawText: String? = null,
+    val chineseRawText: String? = null,
+    val finalOcrText: String? = null,
     val ocrRawText: String? = null,
     val ocrUpdatedAt: Long? = null
 )

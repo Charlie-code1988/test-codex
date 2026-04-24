@@ -51,6 +51,9 @@ class DocumentRepository(
         dao.updateOcrResult(
             documentId = documentId,
             ocrStatus = OcrStatuses.RUNNING,
+            latinRawText = document.latinRawText,
+            chineseRawText = document.chineseRawText,
+            finalOcrText = document.finalOcrText,
             ocrRawText = document.ocrRawText,
             ocrUpdatedAt = System.currentTimeMillis()
         )
@@ -64,12 +67,16 @@ class DocumentRepository(
             val latinText = latinRecognizer.process(image).await().text.orEmpty()
             val chineseText = chineseRecognizer.process(image).await().text.orEmpty()
 
-            val mergedText = selectBetterText(latinText, chineseText)
+            val fusedText = fuseOcrTexts(latinText, chineseText)
+            val finalText = cleanFinalText(fusedText)
 
             dao.updateOcrResult(
                 documentId = documentId,
                 ocrStatus = OcrStatuses.SUCCESS,
-                ocrRawText = mergedText,
+                latinRawText = latinText,
+                chineseRawText = chineseText,
+                finalOcrText = finalText,
+                ocrRawText = finalText,
                 ocrUpdatedAt = System.currentTimeMillis()
             )
             OcrResult.Success
@@ -77,6 +84,9 @@ class DocumentRepository(
             dao.updateOcrResult(
                 documentId = documentId,
                 ocrStatus = OcrStatuses.FAILED,
+                latinRawText = null,
+                chineseRawText = null,
+                finalOcrText = throwable.message,
                 ocrRawText = throwable.message,
                 ocrUpdatedAt = System.currentTimeMillis()
             )
@@ -84,14 +94,84 @@ class DocumentRepository(
         }
     }
 
-    private fun selectBetterText(latinText: String, chineseText: String): String {
-        val chineseChars = chineseText.count { it.code in 0x4E00..0x9FFF }
-        return when {
-            chineseChars > 4 && chineseText.length >= latinText.length / 2 -> chineseText
-            latinText.isBlank() -> chineseText
-            chineseText.isBlank() -> latinText
-            else -> if (chineseText.length > latinText.length) chineseText else latinText
+    private fun fuseOcrTexts(latinText: String, chineseText: String): String {
+        val latinLines = latinText.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val chineseLines = chineseText.lines().map { it.trim() }.filter { it.isNotBlank() }
+        val maxSize = maxOf(latinLines.size, chineseLines.size)
+
+        return buildList {
+            for (index in 0 until maxSize) {
+                val l = latinLines.getOrNull(index).orEmpty()
+                val c = chineseLines.getOrNull(index).orEmpty()
+                add(fuseLine(l, c))
+            }
+        }.joinToString("\n").trim()
+    }
+
+    private fun fuseLine(latinLine: String, chineseLine: String): String {
+        if (latinLine.isBlank()) return chineseLine
+        if (chineseLine.isBlank()) return latinLine
+
+        val hasChineseInChinese = chineseLine.any { it.code in 0x4E00..0x9FFF }
+        val hasChineseInLatin = latinLine.any { it.code in 0x4E00..0x9FFF }
+        val modelRegex = Regex("[A-Za-z]{1,}[-_/]?[A-Za-z0-9]{2,}|\\d+[A-Za-z]+|[A-Za-z]+\\d+")
+
+        var base = when {
+            hasChineseInChinese && !hasChineseInLatin -> chineseLine
+            hasChineseInChinese && chineseLine.length >= latinLine.length * 0.8 -> chineseLine
+            else -> latinLine
         }
+
+        val latinModelTokens = modelRegex.findAll(latinLine).map { it.value }.toList()
+        val missingTokens = latinModelTokens.filter { token -> !base.contains(token) }
+        if (missingTokens.isNotEmpty()) {
+            base += " " + missingTokens.joinToString(" ")
+        }
+
+        return base.trim()
+    }
+
+    private fun cleanFinalText(text: String): String {
+        val lines = text.lines().map { normalizeSpacing(it) }.filter { it.isNotBlank() }
+        val deduped = removeConsecutiveDuplicateLines(lines)
+        return mergeLikelyBrokenLines(deduped).joinToString("\n").trim()
+    }
+
+    private fun normalizeSpacing(line: String): String {
+        return line.replace(Regex("[ \t]+"), " ").trim()
+    }
+
+    private fun removeConsecutiveDuplicateLines(lines: List<String>): List<String> {
+        if (lines.isEmpty()) return lines
+        val result = mutableListOf(lines.first())
+        for (i in 1 until lines.size) {
+            if (lines[i] != lines[i - 1]) {
+                result += lines[i]
+            }
+        }
+        return result
+    }
+
+    private fun mergeLikelyBrokenLines(lines: List<String>): List<String> {
+        val result = mutableListOf<String>()
+        var i = 0
+        while (i < lines.size) {
+            val current = lines[i]
+            val next = lines.getOrNull(i + 1)
+            val shouldMerge = next != null &&
+                current.length <= 6 &&
+                next.length >= 3 &&
+                !current.endsWith(Regex("[。；;:：.!?？]"))
+
+            if (shouldMerge) {
+                result += (current + next)
+                i += 2
+            } else {
+                result += current
+                i += 1
+            }
+        }
+        return result
     }
 
     private fun copyToAppPrivateStorage(originalUri: String): String {
@@ -129,6 +209,9 @@ class DocumentRepository(
             createdAt = createdAt,
             status = status,
             ocrStatus = ocrStatus,
+            latinRawText = latinRawText,
+            chineseRawText = chineseRawText,
+            finalOcrText = finalOcrText,
             ocrRawText = ocrRawText,
             ocrUpdatedAt = ocrUpdatedAt
         )

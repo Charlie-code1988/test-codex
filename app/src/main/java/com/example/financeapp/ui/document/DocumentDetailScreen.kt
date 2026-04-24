@@ -100,24 +100,40 @@ fun DocumentDetailScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(text = "ocrRawText:")
-            Button(
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(document.ocrRawText.orEmpty()))
-                }
-            ) {
+            Text(text = "finalOcrText:")
+            Button(onClick = {
+                clipboardManager.setText(AnnotatedString(document.finalOcrText.orEmpty()))
+            }) {
                 Text("复制 OCR 文本")
             }
         }
 
         Text(
-            text = document.ocrRawText ?: "(空)",
+            text = document.finalOcrText ?: "(空)",
             modifier = Modifier
                 .fillMaxWidth()
                 .heightIn(min = 180.dp, max = 360.dp)
                 .verticalScroll(rememberScrollState())
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(12.dp)
+        )
+
+        Text(text = "—— 原始 OCR 对比 ——", modifier = Modifier.padding(top = 12.dp))
+        Text(text = "Latin 原文:", modifier = Modifier.padding(top = 8.dp))
+        Text(
+            text = document.latinRawText ?: "(空)",
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(8.dp)
+        )
+        Text(text = "Chinese 原文:", modifier = Modifier.padding(top = 8.dp))
+        Text(
+            text = document.chineseRawText ?: "(空)",
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surfaceVariant)
+                .padding(8.dp)
         )
 
         uiState.infoMessage?.let {
