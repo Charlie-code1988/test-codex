@@ -3,6 +3,7 @@ package com.example.financeapp.ui.document
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.financeapp.data.ClassifyDocTypeResult
 import com.example.financeapp.data.Document
 import com.example.financeapp.data.DocumentRepository
 import com.example.financeapp.data.ImportResult
@@ -19,6 +20,7 @@ data class DocumentUiState(
     val selectedDocument: Document? = null,
     val isImporting: Boolean = false,
     val isRunningOcr: Boolean = false,
+    val isClassifying: Boolean = false,
     val infoMessage: String? = null,
     val errorMessage: String? = null
 )
@@ -82,6 +84,24 @@ class DocumentViewModel(
                 }
             }
             _uiState.update { it.copy(isRunningOcr = false) }
+        }
+    }
+
+    fun runClassify(documentId: Long) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isClassifying = true, infoMessage = null, errorMessage = null) }
+            when (val result = repository.classifyDocType(documentId)) {
+                is ClassifyDocTypeResult.Success -> {
+                    _uiState.update { it.copy(infoMessage = "分类完成") }
+                }
+                is ClassifyDocTypeResult.Failed -> {
+                    _uiState.update { it.copy(errorMessage = "分类失败：${result.message}") }
+                }
+                is ClassifyDocTypeResult.DocumentNotFound -> {
+                    _uiState.update { it.copy(errorMessage = "分类失败：单据不存在") }
+                }
+            }
+            _uiState.update { it.copy(isClassifying = false) }
         }
     }
 

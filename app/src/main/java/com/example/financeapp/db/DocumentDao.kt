@@ -43,4 +43,22 @@ interface DocumentDao {
         ocrRawText: String?,
         ocrUpdatedAt: Long
     )
+
+    @Query(
+        """
+        UPDATE documents
+        SET docType = :docType,
+            classifyStatus = :classifyStatus,
+            classifyUpdatedAt = :classifyUpdatedAt,
+            classifyReason = :classifyReason
+        WHERE id = :documentId
+        """
+    )
+    suspend fun updateClassification(
+        documentId: Long,
+        docType: String,
+        classifyStatus: String,
+        classifyUpdatedAt: Long,
+        classifyReason: String?
+    )
 }

@@ -20,6 +20,7 @@ class DocumentRepository(
 ) {
 
     private val textProcessor = OcrTextProcessor()
+    private val docTypeClassifier = DocTypeClassifier()
 
     fun observeDocuments(): Flow<List<Document>> {
         return dao.observeAll().map { entities -> entities.map { it.toModel() } }
@@ -95,6 +96,32 @@ class DocumentRepository(
         }
     }
 
+    suspend fun classifyDocType(documentId: Long): ClassifyDocTypeResult {
+        val document = dao.getById(documentId) ?: return ClassifyDocTypeResult.DocumentNotFound
+        val text = document.finalOcrText.orEmpty()
+
+        return runCatching {
+            val classify = docTypeClassifier.classify(text)
+            dao.updateClassification(
+                documentId = documentId,
+                docType = classify.docType,
+                classifyStatus = ClassifyStatuses.SUCCESS,
+                classifyUpdatedAt = System.currentTimeMillis(),
+                classifyReason = classify.reason
+            )
+            ClassifyDocTypeResult.Success
+        }.getOrElse { throwable ->
+            dao.updateClassification(
+                documentId = documentId,
+                docType = DocTypes.UNKNOWN,
+                classifyStatus = ClassifyStatuses.FAILED,
+                classifyUpdatedAt = System.currentTimeMillis(),
+                classifyReason = throwable.message ?: "分类失败"
+            )
+            ClassifyDocTypeResult.Failed(throwable.message ?: "分类失败")
+        }
+    }
+
     private fun copyToAppPrivateStorage(originalUri: String): String {
         val sourceUri = Uri.parse(originalUri)
         val resolver = context.contentResolver
@@ -134,7 +161,11 @@ class DocumentRepository(
             chineseRawText = chineseRawText,
             finalOcrText = finalOcrText,
             ocrRawText = ocrRawText,
-            ocrUpdatedAt = ocrUpdatedAt
+            ocrUpdatedAt = ocrUpdatedAt,
+            docType = docType,
+            classifyStatus = classifyStatus,
+            classifyUpdatedAt = classifyUpdatedAt,
+            classifyReason = classifyReason
         )
     }
 }
@@ -148,4 +179,10 @@ sealed interface OcrResult {
     data object Success : OcrResult
     data class Failed(val message: String) : OcrResult
     data object DocumentNotFound : OcrResult
+}
+
+sealed interface ClassifyDocTypeResult {
+    data object Success : ClassifyDocTypeResult
+    data class Failed(val message: String) : ClassifyDocTypeResult
+    data object DocumentNotFound : ClassifyDocTypeResult
 }

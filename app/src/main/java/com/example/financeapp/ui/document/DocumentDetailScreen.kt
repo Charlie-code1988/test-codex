@@ -68,12 +68,21 @@ fun DocumentDetailScreen(
                 .size(220.dp)
         )
 
-        Button(
-            onClick = { viewModel.runOcr(document.id) },
-            enabled = !uiState.isRunningOcr,
-            modifier = Modifier.padding(top = 12.dp)
-        ) {
-            Text(if (uiState.isRunningOcr) "OCR 识别中..." else "执行 OCR")
+        Row(modifier = Modifier.padding(top = 12.dp)) {
+            Button(
+                onClick = { viewModel.runOcr(document.id) },
+                enabled = !uiState.isRunningOcr
+            ) {
+                Text(if (uiState.isRunningOcr) "OCR 识别中..." else "执行 OCR")
+            }
+
+            Button(
+                onClick = { viewModel.runClassify(document.id) },
+                enabled = !uiState.isClassifying,
+                modifier = Modifier.padding(start = 12.dp)
+            ) {
+                Text(if (uiState.isClassifying) "分类中..." else "执行分类 / 重新分类")
+            }
         }
 
         Text(text = "documentId: ${document.id}", modifier = Modifier.padding(top = 16.dp))
@@ -92,6 +101,11 @@ fun DocumentDetailScreen(
             modifier = Modifier.padding(top = 12.dp)
         )
         Text(text = "ocrUpdatedAt: ${document.ocrUpdatedAt?.let { formatTime(it) } ?: "-"}")
+
+        Text(text = "docType: ${document.docType}", modifier = Modifier.padding(top = 12.dp))
+        Text(text = "classifyStatus: ${document.classifyStatus}")
+        Text(text = "classifyUpdatedAt: ${document.classifyUpdatedAt?.let { formatTime(it) } ?: "-"}")
+        Text(text = "classifyReason: ${document.classifyReason ?: "-"}")
 
         Row(
             modifier = Modifier
