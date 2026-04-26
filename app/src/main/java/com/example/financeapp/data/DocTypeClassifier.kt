@@ -115,9 +115,9 @@ class DocTypeClassifier(
         labels.forEach { label ->
             findPartyNameAfterLabel(text, label)?.let { partyName ->
                 if (partyName.contains(myCompany)) {
-                    scoreWhenMyCompany.add(6, "$roleName名称为$companyName，判定为我司${if (roleName == "收款人") "收款" else "付款"}")
+                    scoreWhenMyCompany.add(6, "${roleName}名称为$companyName，判定为我司${if (roleName == "收款人") "收款" else "付款"}")
                 } else {
-                    scoreWhenOtherCompany.add(6, "$roleName名称为$partyName，不是我司，判定为我司${if (roleName == "收款人") "付款" else "收款"}")
+                    scoreWhenOtherCompany.add(6, "${roleName}名称为$partyName，不是我司，判定为我司${if (roleName == "收款人") "付款" else "收款"}")
                 }
             }
         }
