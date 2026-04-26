@@ -68,6 +68,7 @@ class DocTypeClassifier(
             )
         }
 
+        applyDirectionScoring(normalized, receiptScore, paymentScore)
         applyReceiptScoring(normalized, receiptScore)
         applyPaymentScoring(normalized, paymentScore)
 
@@ -95,20 +96,61 @@ class DocTypeClassifier(
         )
     }
 
+    private fun applyDirectionScoring(text: String, receiptScore: ScoreBucket, paymentScore: ScoreBucket) {
+        val receiptLabels = listOf("收款人名称", "收款账户", "收款方", "收款人")
+        val payerLabels = listOf("付款人名称", "付款账户", "付款方", "付款人")
+
+        evaluatePartyDirection(text, receiptLabels, "收款人", receiptScore, paymentScore)
+        evaluatePartyDirection(text, payerLabels, "付款人", paymentScore, receiptScore)
+    }
+
+    private fun evaluatePartyDirection(
+        text: String,
+        labels: List<String>,
+        roleName: String,
+        scoreWhenMyCompany: ScoreBucket,
+        scoreWhenOtherCompany: ScoreBucket
+    ) {
+        val myCompany = companyName.lowercase()
+        labels.forEach { label ->
+            findPartyNameAfterLabel(text, label)?.let { partyName ->
+                if (partyName.contains(myCompany)) {
+                    scoreWhenMyCompany.add(6, "$roleName名称为$companyName，判定为我司${if (roleName == "收款人") "收款" else "付款"}")
+                } else {
+                    scoreWhenOtherCompany.add(6, "$roleName名称为$partyName，不是我司，判定为我司${if (roleName == "收款人") "付款" else "收款"}")
+                }
+            }
+        }
+    }
+
+    private fun findPartyNameAfterLabel(text: String, label: String): String? {
+        val index = text.indexOf(label)
+        if (index < 0) return null
+
+        val start = index + label.length
+        val window = text.substring(start, minOf(text.length, start + 30))
+        val cleaned = window
+            .trimStart('：', ':', ' ', '\t')
+            .takeWhile { it !in listOf('，', ',', '。', ';', '；', '\n', '\t', ' ') }
+            .trim()
+
+        return cleaned.takeIf { it.isNotBlank() }
+    }
+
     private fun applyReceiptScoring(text: String, score: ScoreBucket) {
-        addHits(score, text, listOf("收款", "收据", "已收", "回款", "银行回单收入", "转入", "收入", "入账", "收到", "对方户名", "货款", "余额"), 2)
-        if (text.contains("向你转账") || text.contains("转入你") || text.contains("收到转账")) {
-            score.add(3, "转入到你/收到转账语义")
+        addHits(score, text, listOf("收据", "已收", "回款", "银行回单收入", "转入", "收入", "入账", "收到", "对方户名", "货款", "余额"), 2)
+        if (text.contains("向你转账") || text.contains("对方向你转账") || text.contains("转入你") || text.contains("收到转账")) {
+            score.add(3, "对方向你转账/收到转账语义")
         }
     }
 
     private fun applyPaymentScoring(text: String, score: ScoreBucket) {
-        addHits(score, text, listOf("付款", "支付", "已付", "银行回单支出", "转出", "支出", "支付成功", "付款成功", "付款人"), 2)
+        addHits(score, text, listOf("支付", "已付", "银行回单支出", "转出", "支出", "支付成功", "付款成功"), 2)
         if (text.contains("你向") && (text.contains("转账") || text.contains("付款") || text.contains("支付"))) {
-            score.add(3, "你向他方付款/转账语义")
+            score.add(3, "你向对方付款/转账语义")
         }
-        if (text.contains("向") && text.contains("付款")) {
-            score.add(2, "向某方付款语义")
+        if (text.contains("向") && (text.contains("转账") || text.contains("付款"))) {
+            score.add(2, "向xxx转账/付款语义")
         }
     }
 

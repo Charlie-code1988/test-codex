@@ -23,9 +23,35 @@ class DocTypeClassifierTest {
     }
 
     @Test
-    fun bankReceiptSlip_shouldBeReceipt() {
-        val text = "银行回单收入 收款人 交易时间 金额 已收"
-        assertEquals(DocTypes.RECEIPT, classifier.classify(text).docType)
+    fun payeeIsMyCompany_shouldBeReceipt() {
+        val text = "网商银行转账 收款人名称：浙江拜伦智能科技有限公司 金额1000"
+        val result = classifier.classify(text)
+        assertEquals(DocTypes.RECEIPT, result.docType)
+        assertTrue(result.reason.contains("收款人名称为浙江拜伦智能科技有限公司"))
+    }
+
+    @Test
+    fun payeeIsOtherCompany_shouldBePayment() {
+        val text = "网商银行转账 收款人名称：天津龙创恒盛实业有限公司 我司名称：浙江拜伦智能科技有限公司"
+        val result = classifier.classify(text)
+        assertEquals(DocTypes.PAYMENT, result.docType)
+        assertTrue(result.reason.contains("收款人名称为天津龙创恒盛实业有限公司，不是我司"))
+    }
+
+    @Test
+    fun payerIsMyCompany_shouldBePayment() {
+        val text = "付款人名称：浙江拜伦智能科技有限公司 转账成功"
+        val result = classifier.classify(text)
+        assertEquals(DocTypes.PAYMENT, result.docType)
+        assertTrue(result.reason.contains("付款人名称为浙江拜伦智能科技有限公司"))
+    }
+
+    @Test
+    fun payerIsOtherCompany_shouldBeReceipt() {
+        val text = "付款人名称：天津龙创恒盛实业有限公司 备注货款"
+        val result = classifier.classify(text)
+        assertEquals(DocTypes.RECEIPT, result.docType)
+        assertTrue(result.reason.contains("付款人名称为天津龙创恒盛实业有限公司，不是我司"))
     }
 
     @Test
@@ -36,7 +62,7 @@ class DocTypeClassifierTest {
 
     @Test
     fun bankSmsIncome_shouldBeReceipt() {
-        val text = "【银行短信】货款转入，收入金额1000元，对方户名张三，当前余额..."
+        val text = "【银行短信】货款转入，收入金额1000元，对方向你转账，当前余额..."
         assertEquals(DocTypes.RECEIPT, classifier.classify(text).docType)
     }
 
