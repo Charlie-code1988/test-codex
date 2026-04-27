@@ -4,6 +4,7 @@ import androidx.room.Entity
 import androidx.room.PrimaryKey
 import com.example.financeapp.data.ClassifyStatuses
 import com.example.financeapp.data.DocTypes
+import com.example.financeapp.data.ExtractStatuses
 import com.example.financeapp.data.OcrStatuses
 
 @Entity(tableName = "documents")
@@ -22,5 +23,19 @@ data class DocumentEntity(
     val docType: String = DocTypes.UNKNOWN,
     val classifyStatus: String = ClassifyStatuses.IDLE,
     val classifyUpdatedAt: Long? = null,
-    val classifyReason: String? = null
+    val classifyReason: String? = null,
+    val extractStatus: String = ExtractStatuses.IDLE,
+    val extractUpdatedAt: Long? = null,
+    val extractReason: String? = null,
+    val counterpartyName: String? = null,
+    val documentDate: String? = null,
+    val contractNo: String? = null,
+    val productName: String? = null,
+    val productModel: String? = null,
+    val quantity: String? = null,
+    val unitPrice: String? = null,
+    val totalAmount: String? = null,
+    val transactionDate: String? = null,
+    val amount: String? = null,
+    val direction: String? = null
 )

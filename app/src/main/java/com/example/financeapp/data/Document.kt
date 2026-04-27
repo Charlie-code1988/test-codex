@@ -15,7 +15,31 @@ data class Document(
     val docType: String,
     val classifyStatus: String,
     val classifyUpdatedAt: Long?,
-    val classifyReason: String?
+    val classifyReason: String?,
+    val parsedDocument: ParsedDocument?
+)
+
+data class ParsedDocument(
+    val documentId: Long,
+    val docType: String,
+    val extractedFields: ExtractedFields,
+    val extractStatus: String,
+    val extractUpdatedAt: Long?,
+    val extractReason: String?
+)
+
+data class ExtractedFields(
+    val counterpartyName: String? = null,
+    val documentDate: String? = null,
+    val contractNo: String? = null,
+    val productName: String? = null,
+    val productModel: String? = null,
+    val quantity: String? = null,
+    val unitPrice: String? = null,
+    val totalAmount: String? = null,
+    val transactionDate: String? = null,
+    val amount: String? = null,
+    val direction: String? = null
 )
 
 object OcrStatuses {
@@ -34,6 +58,12 @@ object DocTypes {
 }
 
 object ClassifyStatuses {
+    const val IDLE = "IDLE"
+    const val SUCCESS = "SUCCESS"
+    const val FAILED = "FAILED"
+}
+
+object ExtractStatuses {
     const val IDLE = "IDLE"
     const val SUCCESS = "SUCCESS"
     const val FAILED = "FAILED"

@@ -21,6 +21,7 @@ class DocumentRepository(
 
     private val textProcessor = OcrTextProcessor()
     private val docTypeClassifier = DocTypeClassifier()
+    private val fieldExtractor = FieldExtractor()
 
     fun observeDocuments(): Flow<List<Document>> {
         return dao.observeAll().map { entities -> entities.map { it.toModel() } }
@@ -122,6 +123,55 @@ class DocumentRepository(
         }
     }
 
+    suspend fun extractFields(documentId: Long): ExtractFieldsResult {
+        val document = dao.getById(documentId) ?: return ExtractFieldsResult.DocumentNotFound
+        val text = document.finalOcrText.orEmpty()
+
+        return runCatching {
+            val extracted = fieldExtractor.extract(document.docType, text)
+            persistExtractedFields(documentId, extracted.fields, ExtractStatuses.SUCCESS, extracted.reason)
+            ExtractFieldsResult.Success
+        }.getOrElse { throwable ->
+            persistExtractedFields(documentId, ExtractedFields(), ExtractStatuses.FAILED, throwable.message ?: "字段抽取失败")
+            ExtractFieldsResult.Failed(throwable.message ?: "字段抽取失败")
+        }
+    }
+
+    suspend fun saveExtractedFields(documentId: Long, fields: ExtractedFields): SaveExtractedFieldsResult {
+        val document = dao.getById(documentId) ?: return SaveExtractedFieldsResult.DocumentNotFound
+        return runCatching {
+            persistExtractedFields(document.id, fields, document.extractStatus, document.extractReason)
+            SaveExtractedFieldsResult.Success
+        }.getOrElse { throwable ->
+            SaveExtractedFieldsResult.Failed(throwable.message ?: "保存抽取字段失败")
+        }
+    }
+
+    private suspend fun persistExtractedFields(
+        documentId: Long,
+        fields: ExtractedFields,
+        status: String,
+        reason: String?
+    ) {
+        dao.updateExtraction(
+            documentId = documentId,
+            extractStatus = status,
+            extractUpdatedAt = System.currentTimeMillis(),
+            extractReason = reason,
+            counterpartyName = fields.counterpartyName,
+            documentDate = fields.documentDate,
+            contractNo = fields.contractNo,
+            productName = fields.productName,
+            productModel = fields.productModel,
+            quantity = fields.quantity,
+            unitPrice = fields.unitPrice,
+            totalAmount = fields.totalAmount,
+            transactionDate = fields.transactionDate,
+            amount = fields.amount,
+            direction = fields.direction
+        )
+    }
+
     private fun copyToAppPrivateStorage(originalUri: String): String {
         val sourceUri = Uri.parse(originalUri)
         val resolver = context.contentResolver
@@ -165,7 +215,27 @@ class DocumentRepository(
             docType = docType,
             classifyStatus = classifyStatus,
             classifyUpdatedAt = classifyUpdatedAt,
-            classifyReason = classifyReason
+            classifyReason = classifyReason,
+            parsedDocument = ParsedDocument(
+                documentId = id,
+                docType = docType,
+                extractStatus = extractStatus,
+                extractUpdatedAt = extractUpdatedAt,
+                extractReason = extractReason,
+                extractedFields = ExtractedFields(
+                    counterpartyName = counterpartyName,
+                    documentDate = documentDate,
+                    contractNo = contractNo,
+                    productName = productName,
+                    productModel = productModel,
+                    quantity = quantity,
+                    unitPrice = unitPrice,
+                    totalAmount = totalAmount,
+                    transactionDate = transactionDate,
+                    amount = amount,
+                    direction = direction
+                )
+            )
         )
     }
 }
@@ -185,4 +255,16 @@ sealed interface ClassifyDocTypeResult {
     data object Success : ClassifyDocTypeResult
     data class Failed(val message: String) : ClassifyDocTypeResult
     data object DocumentNotFound : ClassifyDocTypeResult
+}
+
+sealed interface ExtractFieldsResult {
+    data object Success : ExtractFieldsResult
+    data class Failed(val message: String) : ExtractFieldsResult
+    data object DocumentNotFound : ExtractFieldsResult
+}
+
+sealed interface SaveExtractedFieldsResult {
+    data object Success : SaveExtractedFieldsResult
+    data class Failed(val message: String) : SaveExtractedFieldsResult
+    data object DocumentNotFound : SaveExtractedFieldsResult
 }

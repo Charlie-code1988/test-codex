@@ -61,4 +61,42 @@ interface DocumentDao {
         classifyUpdatedAt: Long,
         classifyReason: String?
     )
+
+    @Query(
+        """
+        UPDATE documents
+        SET extractStatus = :extractStatus,
+            extractUpdatedAt = :extractUpdatedAt,
+            extractReason = :extractReason,
+            counterpartyName = :counterpartyName,
+            documentDate = :documentDate,
+            contractNo = :contractNo,
+            productName = :productName,
+            productModel = :productModel,
+            quantity = :quantity,
+            unitPrice = :unitPrice,
+            totalAmount = :totalAmount,
+            transactionDate = :transactionDate,
+            amount = :amount,
+            direction = :direction
+        WHERE id = :documentId
+        """
+    )
+    suspend fun updateExtraction(
+        documentId: Long,
+        extractStatus: String,
+        extractUpdatedAt: Long,
+        extractReason: String?,
+        counterpartyName: String?,
+        documentDate: String?,
+        contractNo: String?,
+        productName: String?,
+        productModel: String?,
+        quantity: String?,
+        unitPrice: String?,
+        totalAmount: String?,
+        transactionDate: String?,
+        amount: String?,
+        direction: String?
+    )
 }

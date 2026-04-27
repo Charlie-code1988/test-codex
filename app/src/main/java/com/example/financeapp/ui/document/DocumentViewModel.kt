@@ -6,8 +6,11 @@ import androidx.lifecycle.viewModelScope
 import com.example.financeapp.data.ClassifyDocTypeResult
 import com.example.financeapp.data.Document
 import com.example.financeapp.data.DocumentRepository
+import com.example.financeapp.data.ExtractFieldsResult
+import com.example.financeapp.data.ExtractedFields
 import com.example.financeapp.data.ImportResult
 import com.example.financeapp.data.OcrResult
+import com.example.financeapp.data.SaveExtractedFieldsResult
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +24,8 @@ data class DocumentUiState(
     val isImporting: Boolean = false,
     val isRunningOcr: Boolean = false,
     val isClassifying: Boolean = false,
+    val isExtracting: Boolean = false,
+    val isSavingExtractedFields: Boolean = false,
     val infoMessage: String? = null,
     val errorMessage: String? = null
 )
@@ -102,6 +107,42 @@ class DocumentViewModel(
                 }
             }
             _uiState.update { it.copy(isClassifying = false) }
+        }
+    }
+
+    fun runExtractFields(documentId: Long) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isExtracting = true, infoMessage = null, errorMessage = null) }
+            when (val result = repository.extractFields(documentId)) {
+                is ExtractFieldsResult.Success -> {
+                    _uiState.update { it.copy(infoMessage = "字段抽取完成") }
+                }
+                is ExtractFieldsResult.Failed -> {
+                    _uiState.update { it.copy(errorMessage = "字段抽取失败：${result.message}") }
+                }
+                is ExtractFieldsResult.DocumentNotFound -> {
+                    _uiState.update { it.copy(errorMessage = "字段抽取失败：单据不存在") }
+                }
+            }
+            _uiState.update { it.copy(isExtracting = false) }
+        }
+    }
+
+    fun saveExtractedFields(documentId: Long, fields: ExtractedFields) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(isSavingExtractedFields = true, infoMessage = null, errorMessage = null) }
+            when (val result = repository.saveExtractedFields(documentId, fields)) {
+                is SaveExtractedFieldsResult.Success -> {
+                    _uiState.update { it.copy(infoMessage = "抽取字段已保存") }
+                }
+                is SaveExtractedFieldsResult.Failed -> {
+                    _uiState.update { it.copy(errorMessage = "保存失败：${result.message}") }
+                }
+                is SaveExtractedFieldsResult.DocumentNotFound -> {
+                    _uiState.update { it.copy(errorMessage = "保存失败：单据不存在") }
+                }
+            }
+            _uiState.update { it.copy(isSavingExtractedFields = false) }
         }
     }
 
