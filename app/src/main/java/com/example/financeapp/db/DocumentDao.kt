@@ -78,7 +78,8 @@ interface DocumentDao {
             totalAmount = :totalAmount,
             transactionDate = :transactionDate,
             amount = :amount,
-            direction = :direction
+            direction = :direction,
+            lineItemsText = :lineItemsText
         WHERE id = :documentId
         """
     )
@@ -97,6 +98,7 @@ interface DocumentDao {
         totalAmount: String?,
         transactionDate: String?,
         amount: String?,
-        direction: String?
+        direction: String?,
+        lineItemsText: String?
     )
 }

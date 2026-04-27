@@ -168,8 +168,38 @@ class DocumentRepository(
             totalAmount = fields.totalAmount,
             transactionDate = fields.transactionDate,
             amount = fields.amount,
-            direction = fields.direction
+            direction = fields.direction,
+            lineItemsText = serializeLineItems(fields.lineItems)
         )
+    }
+
+
+    private fun serializeLineItems(lineItems: List<ExtractedLineItem>): String? {
+        if (lineItems.isEmpty()) return null
+        return lineItems.joinToString("\n") { item ->
+            listOf(item.productName, item.productModel, item.quantity, item.unitPrice, item.lineTotal)
+                .joinToString("\t") { token -> token.replace("\t", " ").replace("\n", " ").trim() }
+        }
+    }
+
+    private fun deserializeLineItems(serialized: String?): List<ExtractedLineItem> {
+        if (serialized.isNullOrBlank()) return emptyList()
+        return serialized.lines()
+            .mapNotNull { line ->
+                val parts = line.split("\t")
+                if (parts.isEmpty()) return@mapNotNull null
+                ExtractedLineItem(
+                    productName = parts.getOrElse(0) { "" },
+                    productModel = parts.getOrElse(1) { "" },
+                    quantity = parts.getOrElse(2) { "" },
+                    unitPrice = parts.getOrElse(3) { "" },
+                    lineTotal = parts.getOrElse(4) { "" }
+                )
+            }
+            .filter {
+                it.productName.isNotBlank() || it.productModel.isNotBlank() || it.quantity.isNotBlank() ||
+                    it.unitPrice.isNotBlank() || it.lineTotal.isNotBlank()
+            }
     }
 
     private fun copyToAppPrivateStorage(originalUri: String): String {
@@ -233,7 +263,8 @@ class DocumentRepository(
                     totalAmount = totalAmount,
                     transactionDate = transactionDate,
                     amount = amount,
-                    direction = direction
+                    direction = direction,
+                    lineItems = deserializeLineItems(lineItemsText)
                 )
             )
         )

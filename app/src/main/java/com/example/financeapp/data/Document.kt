@@ -28,6 +28,14 @@ data class ParsedDocument(
     val extractReason: String?
 )
 
+data class ExtractedLineItem(
+    val productName: String = "",
+    val productModel: String = "",
+    val quantity: String = "",
+    val unitPrice: String = "",
+    val lineTotal: String = ""
+)
+
 data class ExtractedFields(
     val counterpartyName: String? = null,
     val documentDate: String? = null,
@@ -39,7 +47,8 @@ data class ExtractedFields(
     val totalAmount: String? = null,
     val transactionDate: String? = null,
     val amount: String? = null,
-    val direction: String? = null
+    val direction: String? = null,
+    val lineItems: List<ExtractedLineItem> = emptyList()
 )
 
 object OcrStatuses {

@@ -37,5 +37,6 @@ data class DocumentEntity(
     val totalAmount: String? = null,
     val transactionDate: String? = null,
     val amount: String? = null,
-    val direction: String? = null
+    val direction: String? = null,
+    val lineItemsText: String? = null
 )
