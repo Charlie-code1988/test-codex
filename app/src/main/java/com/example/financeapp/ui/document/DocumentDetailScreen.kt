@@ -148,7 +148,8 @@ fun DocumentDetailScreen(
                             totalAmount = totalAmount.ifBlank { null },
                             transactionDate = transactionDate.ifBlank { null },
                             amount = amount.ifBlank { null },
-                            direction = direction.ifBlank { null }
+                            direction = direction.ifBlank { null },
+                            lineItems = parsed?.extractedFields?.lineItems ?: emptyList()
                         )
                     )
                 },
@@ -198,6 +199,23 @@ fun DocumentDetailScreen(
         EditableField("交易日期(transactionDate)", transactionDate) { transactionDate = it }
         EditableField("金额(amount)", amount) { amount = it }
         EditableField("方向(direction)", direction) { direction = it }
+
+        Text(text = "商品明细 lineItems", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
+        val lineItems = parsed?.extractedFields?.lineItems.orEmpty()
+        if (lineItems.isEmpty()) {
+            Text(text = "(暂无明细)", modifier = Modifier.padding(top = 6.dp))
+        } else {
+            lineItems.forEachIndexed { index, item ->
+                Text(
+                    text = "#${index + 1} 产品名称: ${item.productName} | 型号: ${item.productModel} | 数量: ${item.quantity} | 单价: ${item.unitPrice} | 小计: ${item.lineTotal}",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 6.dp)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(8.dp)
+                )
+            }
+        }
 
         Row(
             modifier = Modifier

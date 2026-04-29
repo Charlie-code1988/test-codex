@@ -9,40 +9,42 @@ class FieldExtractorTest {
     private val extractor = FieldExtractor()
 
     @Test
-    fun salesContract_multiLineTable_extractsLineItemsAndTotal() {
+    fun salesContract_multiLineTable_extractsAllLineItemsAndCalculatedTotal() {
         val text = """
             销售合同
             合同编号：SC-2026-001
             需方：天津龙创恒盛实业有限公司
-            签订日期：2026-03-01
-            产品名称 型号 数量 含税单价(RMB) 小计(RMB)
-            工业传感器 XH-9 12 613.00 7,356.00
-            控制模块 CM-2 3 1,860.00 5,580.00
-            合计：12,936.00
+            产品名称 | 型号 | 数量 | 单价 | 小计
+            HIWIN直线导轨 | HGH55HA2R1620ZAC | 2 | 2110 | 4220
+            HIWIN滚珠丝杆 | R50-10T4-FSI-1021-0.05 | 1 | 1219 | 1219
+            支撑座 | BK40-C5 | 1 | 390 | 390
+            支撑座 | BF40 | 1 | 171 | 171
+            税号：91330106MA27X12345
+            账号：622233445566778899
         """.trimIndent()
 
         val result = extractor.extract(DocTypes.SALES_CONTRACT, text)
 
-        assertEquals(2, result.fields.lineItems.size)
-        assertEquals("工业传感器", result.fields.lineItems[0].productName)
-        assertEquals("XH-9", result.fields.lineItems[0].productModel)
-        assertEquals("12", result.fields.lineItems[0].quantity)
-        assertEquals("613.00", result.fields.lineItems[0].unitPrice)
-        assertEquals("7356.00", result.fields.lineItems[0].lineTotal)
-        assertEquals("12936.00", result.fields.totalAmount)
+        assertEquals(4, result.fields.lineItems.size)
+        assertEquals("HIWIN直线导轨", result.fields.lineItems[0].productName)
+        assertEquals("HGH55HA2R1620ZAC", result.fields.lineItems[0].productModel)
+        assertEquals("2", result.fields.lineItems[0].quantity)
+        assertEquals("2110", result.fields.lineItems[0].unitPrice)
+        assertEquals("4220", result.fields.lineItems[0].lineTotal)
+        assertEquals("6000", result.fields.totalAmount)
     }
 
     @Test
-    fun purchaseContract_multiLineTable_extractsLineItemsAndTotal() {
+    fun purchaseContract_multiLineTable_extractsLineItemsAndSkipsNoiseRows() {
         val text = """
             采购合同
             甲方：浙江拜伦智能科技有限公司
             供方：苏州新科贸昜有限公司
-            日期：2026年04月10日
             名称 规格/型号 数量 单价 总金额
-            泵体组件 PB-20A 3 1,860.00 5,580.00
-            连接件 LK-7 2 140.00 280.00
-            总金额：5,860.00
+            泵体组件 PB-20A 3 1860 5580
+            连接件 LK-7 2 140 280
+            电话：13800138000
+            地址：杭州市西湖区xxx路55号
         """.trimIndent()
 
         val result = extractor.extract(DocTypes.PURCHASE_CONTRACT, text)
@@ -51,13 +53,13 @@ class FieldExtractorTest {
         assertEquals("泵体组件", result.fields.lineItems[0].productName)
         assertEquals("PB-20A", result.fields.lineItems[0].productModel)
         assertEquals("3", result.fields.lineItems[0].quantity)
-        assertEquals("1860.00", result.fields.lineItems[0].unitPrice)
-        assertEquals("5580.00", result.fields.lineItems[0].lineTotal)
-        assertEquals("5860.00", result.fields.totalAmount)
+        assertEquals("1860", result.fields.lineItems[0].unitPrice)
+        assertEquals("5580", result.fields.lineItems[0].lineTotal)
+        assertEquals("5860", result.fields.totalAmount)
     }
 
     @Test
-    fun receiptSlip_extractsCounterpartyDateAmount() {
+    fun receiptSlip_extractsCounterpartyDateAndAmount() {
         val text = """
             网商银行电子回单
             收款户名：浙江拜伦智能科技有限公司
@@ -77,7 +79,7 @@ class FieldExtractorTest {
     }
 
     @Test
-    fun paymentSlip_extractsCounterpartyDateAmount() {
+    fun paymentSlip_extractsCounterpartyDateAndAmount() {
         val text = """
             网商银行电子回单
             付款户名：浙江拜伦智能科技有限公司
@@ -96,12 +98,10 @@ class FieldExtractorTest {
     }
 
     @Test
-    fun shouldNotTreatAccountSerialTaxNoPhoneAsAmount() {
+    fun amountShouldNotUseContractNoTaxNoPhoneOrSerial() {
         val text = """
-            收款户名：北京云启科技有限公司
-            付款户名：浙江拜伦智能科技有限公司
+            合同编号：SC-2026-55
             税号：91330106MA27X12345
-            付款账号：622233445566778899
             手机号：13800138000
             流水号：202604171416070000123456
             转账金额：613.00
