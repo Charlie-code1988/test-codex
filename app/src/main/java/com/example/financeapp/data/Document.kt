@@ -25,7 +25,8 @@ data class ParsedDocument(
     val extractedFields: ExtractedFields,
     val extractStatus: String,
     val extractUpdatedAt: Long?,
-    val extractReason: String?
+    val extractReason: String?,
+    val lineItemsRawText: String?
 )
 
 data class ExtractedLineItem(

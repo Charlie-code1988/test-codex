@@ -12,17 +12,21 @@ class FieldExtractor(
             return ExtractResult(ExtractedFields(), "OCR 文本为空")
         }
 
+        val debug = mutableListOf<String>()
+        debug += "docType=$docType"
+
         val fields = when (docType) {
-            DocTypes.SALES_CONTRACT, DocTypes.PURCHASE_CONTRACT -> extractContractFields(text)
-            DocTypes.RECEIPT, DocTypes.PAYMENT -> extractTransferFields(text, docType)
+            DocTypes.SALES_CONTRACT, DocTypes.PURCHASE_CONTRACT -> extractContractFields(text, debug)
+            DocTypes.RECEIPT, DocTypes.PAYMENT -> extractTransferFields(text, docType, debug)
             else -> ExtractedFields()
         }
 
-        return ExtractResult(fields, "规则提取完成：docType=$docType")
+        debug += "finalLineItems=${fields.lineItems.size}"
+        return ExtractResult(fields, debug.joinToString(" | "))
     }
 
-    private fun extractContractFields(text: String): ExtractedFields {
-        val lineItems = parseContractLineItems(text)
+    private fun extractContractFields(text: String, debug: MutableList<String>): ExtractedFields {
+        val lineItems = parseContractLineItems(text, debug)
         val first = lineItems.firstOrNull()
 
         val totalAmount = findReliableTotalAmount(text)
@@ -41,30 +45,59 @@ class FieldExtractor(
         )
     }
 
-    private fun extractTransferFields(text: String, docType: String): ExtractedFields {
+    private fun extractTransferFields(text: String, docType: String, debug: MutableList<String>): ExtractedFields {
         val direction = if (docType == DocTypes.RECEIPT) DocTypes.RECEIPT else DocTypes.PAYMENT
 
+        val txDate = findDateByLabels(text, listOf("交易时间", "交易日期", "转账时间", "支付时间", "日期")) ?: findDate(text)
+        val counterparty = findCounterpartyForTransfer(text, direction)
+        val amount = findAmountNearLabels(text, listOf("转账金额", "交易金额", "收款金额", "付款金额", "金额", "小写", "￥", "¥"))
+        debug += "transferCounterparty=$counterparty"
+        debug += "transferDate=$txDate"
+        debug += "transferAmount=$amount"
         return ExtractedFields(
-            transactionDate = findDateByLabels(text, listOf("交易时间", "交易日期", "转账时间", "支付时间", "日期")) ?: findDate(text),
-            counterpartyName = findCounterpartyForTransfer(text, direction),
-            amount = findAmountNearLabels(text, listOf("转账金额", "交易金额", "收款金额", "付款金额", "金额", "小写", "￥", "¥")),
+            transactionDate = txDate,
+            counterpartyName = counterparty,
+            amount = amount,
             direction = direction
         )
     }
 
-    private fun parseContractLineItems(text: String): List<ExtractedLineItem> {
+    private fun parseContractLineItems(text: String, debug: MutableList<String>): List<ExtractedLineItem> {
         val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
         val headerIndex = lines.indexOfFirst { isHeaderLine(it) }
-        if (headerIndex < 0) return emptyList()
+        if (headerIndex < 0) {
+            debug += "headerDetected=false"
+            return emptyList()
+        }
+        debug += "headerDetected=true"
+        debug += "headerLine=${lines[headerIndex]}"
 
         val items = mutableListOf<ExtractedLineItem>()
         for (idx in (headerIndex + 1) until lines.size) {
             val line = lines[idx]
-            if (isHardStopSummaryLine(line)) break
-            if (isHeaderLine(line) || isIgnoredRow(line)) continue
+            if (isHardStopSummaryLine(line)) {
+                debug += "stopLine=$line"
+                break
+            }
+            if (isHeaderLine(line)) {
+                debug += "reject(header)=$line"
+                continue
+            }
+            if (isIgnoredRow(line)) {
+                debug += "reject(ignored)=$line"
+                continue
+            }
 
-            parseContractDataLine(line)?.let { items += it }
+            debug += "candidateLine=$line"
+            val parsed = parseContractDataLine(line)
+            if (parsed == null) {
+                debug += "reject(parse_failed)=$line"
+            } else {
+                debug += "accept=${parsed.productName}|${parsed.productModel}|${parsed.quantity}|${parsed.unitPrice}|${parsed.lineTotal}"
+                items += parsed
+            }
         }
+        debug += "lineItemsGenerated=${items.size}"
         return items
     }
 

@@ -125,6 +125,8 @@ fun DocumentDetailScreen(
             }
         }
 
+        Text(text = "lineItemsText(raw): ${parsed?.lineItemsRawText ?: "-"}", modifier = Modifier.padding(top = 8.dp))
+
         Row(modifier = Modifier.padding(top = 8.dp)) {
             Button(
                 onClick = { viewModel.runExtractFields(document.id) },
@@ -202,8 +204,9 @@ fun DocumentDetailScreen(
 
         Text(text = "商品明细 lineItems", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(top = 12.dp))
         val lineItems = parsed?.extractedFields?.lineItems.orEmpty()
+        Text(text = "lineItems 数量: ${lineItems.size}", modifier = Modifier.padding(top = 6.dp))
         if (lineItems.isEmpty()) {
-            Text(text = "(暂无明细)", modifier = Modifier.padding(top = 6.dp))
+            Text(text = "未抽取到商品明细", modifier = Modifier.padding(top = 6.dp))
         } else {
             lineItems.forEachIndexed { index, item ->
                 Text(
@@ -216,6 +219,8 @@ fun DocumentDetailScreen(
                 )
             }
         }
+
+        Text(text = "lineItemsText(raw): ${parsed?.lineItemsRawText ?: "-"}", modifier = Modifier.padding(top = 8.dp))
 
         Row(
             modifier = Modifier

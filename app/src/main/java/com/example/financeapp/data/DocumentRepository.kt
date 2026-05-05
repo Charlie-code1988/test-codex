@@ -252,6 +252,7 @@ class DocumentRepository(
                 extractStatus = extractStatus,
                 extractUpdatedAt = extractUpdatedAt,
                 extractReason = extractReason,
+                lineItemsRawText = lineItemsText,
                 extractedFields = ExtractedFields(
                     counterpartyName = counterpartyName,
                     documentDate = documentDate,
