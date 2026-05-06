@@ -15,18 +15,22 @@ class FieldExtractor(
         val debug = mutableListOf<String>()
         debug += "docType=$docType"
 
+        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+        debug += "ocrLines=${lines.size}"
+        lines.forEachIndexed { i, line -> debug += "[$i] $line" }
+
         val fields = when (docType) {
-            DocTypes.SALES_CONTRACT, DocTypes.PURCHASE_CONTRACT -> extractContractFields(text, debug)
+            DocTypes.SALES_CONTRACT, DocTypes.PURCHASE_CONTRACT -> extractContractFields(text, lines, debug)
             DocTypes.RECEIPT, DocTypes.PAYMENT -> extractTransferFields(text, docType, debug)
             else -> ExtractedFields()
         }
 
         debug += "finalLineItems=${fields.lineItems.size}"
-        return ExtractResult(fields, debug.joinToString(" | "))
+        return ExtractResult(fields, debug.joinToString("\n"))
     }
 
-    private fun extractContractFields(text: String, debug: MutableList<String>): ExtractedFields {
-        val lineItems = parseContractLineItems(text, debug)
+    private fun extractContractFields(text: String, lines: List<String>, debug: MutableList<String>): ExtractedFields {
+        val lineItems = parseContractLineItems(lines, debug)
         val first = lineItems.firstOrNull()
 
         val totalAmount = findReliableTotalAmount(text)
@@ -47,13 +51,14 @@ class FieldExtractor(
 
     private fun extractTransferFields(text: String, docType: String, debug: MutableList<String>): ExtractedFields {
         val direction = if (docType == DocTypes.RECEIPT) DocTypes.RECEIPT else DocTypes.PAYMENT
-
         val txDate = findDateByLabels(text, listOf("交易时间", "交易日期", "转账时间", "支付时间", "日期")) ?: findDate(text)
         val counterparty = findCounterpartyForTransfer(text, direction)
         val amount = findAmountNearLabels(text, listOf("转账金额", "交易金额", "收款金额", "付款金额", "金额", "小写", "￥", "¥"))
+
         debug += "transferCounterparty=$counterparty"
         debug += "transferDate=$txDate"
         debug += "transferAmount=$amount"
+
         return ExtractedFields(
             transactionDate = txDate,
             counterpartyName = counterparty,
@@ -62,48 +67,71 @@ class FieldExtractor(
         )
     }
 
-    private fun parseContractLineItems(text: String, debug: MutableList<String>): List<ExtractedLineItem> {
-        val lines = text.lines().map { it.trim() }.filter { it.isNotBlank() }
+    private fun parseContractLineItems(lines: List<String>, debug: MutableList<String>): List<ExtractedLineItem> {
         val headerIndex = lines.indexOfFirst { isHeaderLine(it) }
-        if (headerIndex < 0) {
-            debug += "headerDetected=false"
-            return emptyList()
-        }
-        debug += "headerDetected=true"
-        debug += "headerLine=${lines[headerIndex]}"
+        debug += "headerDetected=${headerIndex >= 0}"
+        debug += "headerIndex=$headerIndex"
+        if (headerIndex >= 0) debug += "headerLine=${lines[headerIndex]}"
+
+        val startIndex = if (headerIndex >= 0) headerIndex + 1 else 0
 
         val items = mutableListOf<ExtractedLineItem>()
-        for (idx in (headerIndex + 1) until lines.size) {
-            val line = lines[idx]
+        var i = startIndex
+        while (i < lines.size) {
+            val line = lines[i]
             if (isHardStopSummaryLine(line)) {
-                debug += "stopLine=$line"
+                debug += "stopLine[$i]=$line"
                 break
             }
             if (isHeaderLine(line)) {
-                debug += "reject(header)=$line"
+                debug += "reject(header)[$i]=$line"
+                i++
                 continue
             }
             if (isIgnoredRow(line)) {
-                debug += "reject(ignored)=$line"
+                debug += "reject(ignored)[$i]=$line"
+                i++
                 continue
             }
 
-            debug += "candidateLine=$line"
-            val parsed = parseContractDataLine(line)
-            if (parsed == null) {
-                debug += "reject(parse_failed)=$line"
-            } else {
-                debug += "accept=${parsed.productName}|${parsed.productModel}|${parsed.quantity}|${parsed.unitPrice}|${parsed.lineTotal}"
-                items += parsed
+            val single = parseContractDataLine(line)
+            if (single != null) {
+                debug += "accept(single)[$i]=${single.productName}|${single.productModel}|${single.quantity}|${single.unitPrice}|${single.lineTotal}"
+                items += single
+                i++
+                continue
+            }
+
+            var accepted = false
+            for (groupSize in 2..3) {
+                if (i + groupSize - 1 >= lines.size) continue
+                val merged = (0 until groupSize).joinToString(" ") { offset -> lines[i + offset] }
+                if ((1 until groupSize).any { isIgnoredRow(lines[i + it]) || isHardStopSummaryLine(lines[i + it]) }) continue
+
+                debug += "candidate(merged${groupSize})[$i]=${merged}"
+                val mergedItem = parseContractDataLine(merged)
+                if (mergedItem != null) {
+                    debug += "accept(merged${groupSize})[$i]=${mergedItem.productName}|${mergedItem.productModel}|${mergedItem.quantity}|${mergedItem.unitPrice}|${mergedItem.lineTotal}"
+                    items += mergedItem
+                    i += groupSize
+                    accepted = true
+                    break
+                }
+            }
+
+            if (!accepted) {
+                debug += "reject(parse_failed)[$i]=$line"
+                i++
             }
         }
+
         debug += "lineItemsGenerated=${items.size}"
         return items
     }
 
     private fun isHeaderLine(line: String): Boolean {
         val keys = listOf("产品名称", "名称", "品名", "型号", "规格", "规格型号", "规格/型号", "数量", "单价", "含税单价", "小计", "金额", "总金额")
-        return keys.count { line.contains(it) } >= 3
+        return keys.count { line.contains(it) } >= 2
     }
 
     private fun isHardStopSummaryLine(line: String): Boolean {
@@ -119,30 +147,30 @@ class FieldExtractor(
         val tokens = line.split(Regex("\\s+|[|｜]"))
             .map { it.trim() }
             .filter { it.isNotBlank() }
-        if (tokens.size < 4) return null
+        if (tokens.size < 3) return null
 
-        val numericIndices = tokens.mapIndexedNotNull { idx, token ->
-            if (isNumericToken(token)) idx else null
-        }
-        if (numericIndices.size < 2) return null
+        val numericIdx = tokens.mapIndexedNotNull { idx, token -> if (isNumericToken(token)) idx else null }
+        if (numericIdx.size < 2) return null
 
-        val firstNumeric = numericIndices.first()
-        if (firstNumeric < 2) return null
+        val firstNumeric = numericIdx.first()
+        if (firstNumeric <= 0) return null
 
-        val productName = tokens[0]
-        val productModel = tokens.subList(1, firstNumeric).joinToString(" ")
-        if (!productName.any { it.isLetter() } || !containsChinese(productName)) return null
-        if (productModel.isBlank()) return null
+        val productTokens = tokens.subList(0, firstNumeric)
+        val productName = productTokens.firstOrNull().orEmpty()
+        val productModel = productTokens.drop(1).joinToString(" ")
 
-        val quantity = normalizeAmount(tokens[numericIndices[0]])
-        val unitPrice = normalizeAmount(tokens[numericIndices[1]])
+        val hasChineseProduct = containsChinese(productName)
+        val hasModelLike = Regex("[A-Za-z]+[0-9-]{1,}").containsMatchIn(productModel.ifBlank { line })
+        if (!hasChineseProduct && !hasModelLike) return null
+
+        val nums = numericIdx.map { normalizeAmount(tokens[it]) }
+        if (nums.size < 2) return null
+
+        val quantity = nums[0]
+        val unitPrice = nums[1]
+        val lineTotal = nums.getOrNull(2) ?: calcLineTotal(quantity, unitPrice)
+
         if (!looksLikeQuantity(quantity) || !looksLikePrice(unitPrice)) return null
-
-        val lineTotal = if (numericIndices.size >= 3) {
-            normalizeAmount(tokens[numericIndices[2]])
-        } else {
-            calcLineTotal(quantity, unitPrice)
-        }
 
         return ExtractedLineItem(
             productName = productName,
@@ -176,14 +204,12 @@ class FieldExtractor(
             findByLabels(text, listOf("需方", "买方", "采购方", "甲方")),
             findByLabels(text, listOf("供方", "卖方", "供应商", "乙方"))
         ).firstOrNull { !it.isNullOrBlank() && !it.contains(companyName) }
-
         return candidate ?: findCompanyLikeName(text)
     }
 
     private fun findCounterpartyForTransfer(text: String, direction: String): String? {
         val payee = findByLabels(text, listOf("收款账户户名", "收款户名", "收款人", "收款方", "收款账户"))
         val payer = findByLabels(text, listOf("付款账户户名", "付款户名", "付款人", "付款方", "付款账户"))
-
         val ordered = if (direction == DocTypes.PAYMENT) listOf(payee, payer) else listOf(payer, payee)
         return ordered.firstOrNull { !it.isNullOrBlank() && !it.contains(companyName) }
             ?: ordered.firstOrNull { !it.isNullOrBlank() }
@@ -236,7 +262,6 @@ class FieldExtractor(
         if (value.length >= 11 && !value.contains('.')) return false
         val number = value.toDoubleOrNull() ?: return false
         if (number <= 0) return false
-
         val hasCurrencyStyle = raw.contains(".") || raw.contains(",") || raw.contains("¥") || raw.contains("￥")
         if (!hasCurrencyStyle && !allowSmallInteger && number < 100) return false
         if (!hasCurrencyStyle && value.length > 6) return false
@@ -248,10 +273,7 @@ class FieldExtractor(
             val idx = text.indexOf(label)
             if (idx < 0) return@forEach
             val window = text.substring(idx + label.length, minOf(text.length, idx + label.length + 64))
-            val value = window
-                .trimStart('：', ':', ' ', '\t')
-                .takeWhile { it !in listOf('\n', '，', ',', ';', '；') }
-                .trim()
+            val value = window.trimStart('：', ':', ' ', '\t').takeWhile { it !in listOf('\n', '，', ',', ';', '；') }.trim()
             if (value.isNotBlank() && !isNoiseValue(value)) return value
         }
         return null
@@ -266,9 +288,7 @@ class FieldExtractor(
 
     private fun findCompanyLikeName(text: String): String? {
         val regex = Regex("([\\u4e00-\\u9fa5A-Za-z0-9（）()]{2,}(?:有限公司|公司|厂|个体工商户))")
-        return regex.findAll(text)
-            .map { it.value }
-            .firstOrNull { !it.contains(companyName) }
+        return regex.findAll(text).map { it.value }.firstOrNull { !it.contains(companyName) }
     }
 
     private fun isNumericToken(token: String): Boolean {

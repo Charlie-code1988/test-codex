@@ -111,4 +111,20 @@ class FieldExtractorTest {
 
         assertEquals("613.00", result.fields.amount)
     }
+
+    @Test
+    fun messyOcrLines_shouldStillExtractAtLeastOneLineItem() {
+        val text = """
+            销售合同
+            型号 数量 单价 小计
+            HIWIN直线导轨
+            HGH55HA2R1620ZAC 2
+            2110 4220
+            税号 91330106MA27X12345
+        """.trimIndent()
+
+        val result = extractor.extract(DocTypes.SALES_CONTRACT, text)
+
+        assertTrue(result.fields.lineItems.isNotEmpty())
+    }
 }
